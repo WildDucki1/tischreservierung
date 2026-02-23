@@ -590,69 +590,90 @@
   </div>
 </div>
 
-<script>
+<!-- Firebase SDKs -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ── FIREBASE CONFIG ────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyAODdATV3lEjzvlLHdBluSh4DdFL2Og5Lc",
+  authDomain: "tischreservirung.firebaseapp.com",
+  projectId: "tischreservirung",
+  storageBucket: "tischreservirung.firebasestorage.app",
+  messagingSenderId: "1053055806378",
+  appId: "1:1053055806378:web:ea2cafa6e6134bde6e99d3",
+  databaseURL: "https://tischreservirung-default-rtdb.europe-west1.firebasedatabase.app"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+// ───────────────────────────────────────────────────────
+
+// ── TISCH-DEFINITIONEN (Name, Plätze — Status kommt aus Firebase) ──
 const sections = [
   {
-    id: 'terrasse',
-    name: 'Terrasse',
-    icon: '🌿',
+    id: 'terrasse', name: 'Terrasse', icon: '🌿',
     tables: [
-      { id: 't1', name: 'Tisch 1', seats: 2, status: 'frei' },
-      { id: 't2', name: 'Tisch 2', seats: 4, status: 'frei' },
-      { id: 't3', name: 'Tisch 3', seats: 4, status: 'reserviert' },
-      { id: 't4', name: 'Tisch 4', seats: 6, status: 'frei' },
-      { id: 't5', name: 'Tisch 5', seats: 2, status: 'belegt' },
-      { id: 't6', name: 'Tisch 6', seats: 4, status: 'frei' },
-      { id: 't7', name: 'Tisch 7', seats: 4, status: 'frei' },
-      { id: 't8', name: 'Tisch 8', seats: 8, status: 'frei' },
+      { id: 't1', name: 'Tisch 1', seats: 2 },
+      { id: 't2', name: 'Tisch 2', seats: 4 },
+      { id: 't3', name: 'Tisch 3', seats: 4 },
+      { id: 't4', name: 'Tisch 4', seats: 6 },
+      { id: 't5', name: 'Tisch 5', seats: 2 },
+      { id: 't6', name: 'Tisch 6', seats: 4 },
+      { id: 't7', name: 'Tisch 7', seats: 4 },
+      { id: 't8', name: 'Tisch 8', seats: 8 },
     ]
   },
   {
-    id: 'captain',
-    name: 'Captain Lounge',
-    icon: '⚓',
+    id: 'captain', name: 'Captain Lounge', icon: '⚓',
     tables: [
-      { id: 'c1', name: 'Table A', seats: 2, status: 'frei' },
-      { id: 'c2', name: 'Table B', seats: 4, status: 'belegt' },
-      { id: 'c3', name: 'Table C', seats: 4, status: 'frei' },
-      { id: 'c4', name: 'Table D', seats: 6, status: 'reserviert' },
-      { id: 'c5', name: 'Table E', seats: 2, status: 'frei' },
-      { id: 'c6', name: 'Table F', seats: 4, status: 'frei' },
+      { id: 'c1', name: 'Table A', seats: 2 },
+      { id: 'c2', name: 'Table B', seats: 4 },
+      { id: 'c3', name: 'Table C', seats: 4 },
+      { id: 'c4', name: 'Table D', seats: 6 },
+      { id: 'c5', name: 'Table E', seats: 2 },
+      { id: 'c6', name: 'Table F', seats: 4 },
     ]
   },
   {
-    id: 'eclipse',
-    name: 'Eclipse Lounge',
-    icon: '🌙',
+    id: 'eclipse', name: 'Eclipse Lounge', icon: '🌙',
     tables: [
-      { id: 'e1', name: 'Suite I',   seats: 2, status: 'frei' },
-      { id: 'e2', name: 'Suite II',  seats: 2, status: 'reserviert' },
-      { id: 'e3', name: 'Suite III', seats: 4, status: 'frei' },
-      { id: 'e4', name: 'Suite IV',  seats: 4, status: 'belegt' },
-      { id: 'e5', name: 'Suite V',   seats: 6, status: 'frei' },
-      { id: 'e6', name: 'Suite VI',  seats: 2, status: 'frei' },
-      { id: 'e7', name: 'Suite VII', seats: 4, status: 'frei' },
+      { id: 'e1', name: 'Suite I',   seats: 2 },
+      { id: 'e2', name: 'Suite II',  seats: 2 },
+      { id: 'e3', name: 'Suite III', seats: 4 },
+      { id: 'e4', name: 'Suite IV',  seats: 4 },
+      { id: 'e5', name: 'Suite V',   seats: 6 },
+      { id: 'e6', name: 'Suite VI',  seats: 2 },
+      { id: 'e7', name: 'Suite VII', seats: 4 },
     ]
   }
 ];
 
 const statusLabels = { frei: 'Frei', reserviert: 'Reserviert', belegt: 'Belegt' };
 
-let currentTable = null;
+// Live-Status aus Firebase (wird laufend aktualisiert)
+let liveStatus = {};
+
+let currentTableId = null;
 let selectedStatus = null;
 
-function getTable(id) {
+// ── HELPER ──
+function getTableMeta(id) {
   for (const s of sections)
     for (const t of s.tables)
       if (t.id === id) return t;
 }
-
-function getSection(tableId) {
+function getSectionOf(tableId) {
   for (const s of sections)
     for (const t of s.tables)
       if (t.id === tableId) return s;
 }
+function statusOf(id) {
+  return liveStatus[id] || 'frei';
+}
 
+// ── RENDER ──
 function render() {
   const app = document.getElementById('app');
   app.innerHTML = sections.map(sec => `
@@ -663,77 +684,85 @@ function render() {
         <div class="section-count">${sec.tables.length} Tische</div>
       </div>
       <div class="table-grid">
-        ${sec.tables.map(t => `
-          <div class="table-card ${t.status}" onclick="openModal('${t.id}')">
+        ${sec.tables.map(t => {
+          const st = statusOf(t.id);
+          return `
+          <div class="table-card ${st}" onclick="window._openModal('${t.id}')">
             <span class="table-icon">🪑</span>
             <div class="table-name">${t.name}</div>
             <div class="table-seats">${t.seats} Plätze</div>
-            <span class="table-status">${statusLabels[t.status]}</span>
-          </div>
-        `).join('')}
+            <span class="table-status">${statusLabels[st]}</span>
+          </div>`;
+        }).join('')}
       </div>
     </div>
   `).join('');
 }
 
-function openModal(tableId) {
-  currentTable = getTable(tableId);
-  const sec = getSection(tableId);
-  selectedStatus = currentTable.status;
+// ── FIREBASE LIVE-SYNC ──
+// Hört auf Änderungen in Echtzeit — jede Änderung von dir oder deinem Kollegen
+// erscheint sofort bei allen
+onValue(ref(db, 'tische'), (snapshot) => {
+  const data = snapshot.val() || {};
+  liveStatus = data;
+  render();
+});
 
-  document.getElementById('modalTitle').textContent = currentTable.name;
+// ── MODAL ──
+window._openModal = function(tableId) {
+  currentTableId = tableId;
+  const t   = getTableMeta(tableId);
+  const sec = getSectionOf(tableId);
+  selectedStatus = statusOf(tableId);
+
+  document.getElementById('modalTitle').textContent   = t.name;
   document.getElementById('modalSection').textContent = sec.name;
   updateStatusButtons();
-
   document.getElementById('modalOverlay').classList.add('active');
-}
+};
 
-function closeModal() {
+window.closeModal = function() {
   document.getElementById('modalOverlay').classList.remove('active');
-  currentTable = null;
-}
+  currentTableId = null;
+};
 
-function selectStatus(status) {
+window.selectStatus = function(status) {
   selectedStatus = status;
   updateStatusButtons();
-}
+};
 
 function updateStatusButtons() {
   document.querySelectorAll('.status-btn').forEach(btn => {
     btn.className = 'status-btn';
-    if (btn.dataset.status === selectedStatus) {
+    if (btn.dataset.status === selectedStatus)
       btn.classList.add('selected', selectedStatus);
-    }
   });
 }
 
-function applyStatus() {
-  if (!currentTable || !selectedStatus) return;
-  currentTable.status = selectedStatus;
-  render();
+// ── SPEICHERN → schreibt in Firebase → alle sehen es sofort ──
+window.applyStatus = function() {
+  if (!currentTableId || !selectedStatus) return;
+  set(ref(db, `tische/${currentTableId}`), selectedStatus);
   closeModal();
-}
+};
 
-// Close on overlay click
 document.getElementById('modalOverlay').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
 
 // ── LOGIN ──────────────────────────────────────────────
-// Zugangsdaten hier anpassen:
 const ACCOUNTS = [
   { user: 'admin',   pass: 'admin123' },
   { user: 'kollege', pass: 'lounge2024' },
 ];
 
-// Shake animation
 const shakeStyle = document.createElement('style');
 shakeStyle.textContent = `@keyframes shake {
   0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)}
 }`;
 document.head.appendChild(shakeStyle);
 
-function doLogin() {
+window.doLogin = function() {
   const user = document.getElementById('loginUser').value.trim();
   const pass = document.getElementById('loginPass').value;
   const match = ACCOUNTS.find(a => a.user === user && a.pass === pass);
@@ -750,17 +779,18 @@ function doLogin() {
     void box.offsetHeight;
     box.style.animation = 'shake 0.35s ease';
   }
-}
+};
 
-function doLogout() {
+window.doLogout = function() {
   document.getElementById('loginScreen').classList.remove('hidden');
   document.getElementById('logoutBtn').style.display = 'none';
   document.getElementById('loginUser').value = '';
   document.getElementById('loginPass').value = '';
   document.getElementById('loginError').textContent = '';
-}
+};
 // ───────────────────────────────────────────────────────
 
+// Erste Render (ohne Firebase-Daten, als Platzhalter)
 render();
 </script>
 </body>
